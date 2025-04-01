@@ -1,0 +1,20 @@
+[project]
+name = "random-paper-implementations"
+version = "0.1.0"
+description = "Implementations of various condition monitoring methodologies"
+authors = [
+    {name = "ryanbalshaw81@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "numpy (>=2.2.4,<3.0.0)",
+    "matplotlib (>=3.10.1,<4.0.0)",
+    "scikit-learn (>=1.6.1,<2.0.0)",
+    "scipy (>=1.15.2,<2.0.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
