@@ -23,5 +23,5 @@ LaTex citation:
   urldate = {2025-03-28},
 ```
 
-## Implementation information
+## Methodology summary
 
