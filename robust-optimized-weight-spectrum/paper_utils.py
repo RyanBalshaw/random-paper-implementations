@@ -1,12 +1,15 @@
+from matplotlib import pyplot as plt
 from sklearn.utils.validation import check_is_fitted
 from sklearn.exceptions import NotFittedError
 from sklearn.utils.estimator_checks import check_estimator
+from sklearn.utils.validation import validate_data
 from sklearn.base import BaseEstimator, ClassifierMixin
 import numpy as np
+from sklearn.datasets import make_circles, make_moons, make_classification, make_blobs
 
 # https://scikit-learn.org/stable/developers/develop.html#estimators
 class LogisticRegression(ClassifierMixin, BaseEstimator):
-    def __init__(self, param = 1):
+    def __init__(self, max_iter=100):
         """
         Every keyword argument accepted by __init__ should correspond to an attribute
         on the instance. Scikit-learn relies on this to find the relevant attributes to
@@ -14,25 +17,60 @@ class LogisticRegression(ClassifierMixin, BaseEstimator):
         even input validation, and the parameters should not be changed; which also
         means ideally they should not be mutable objects such as lists or dictionaries.
         """
-        self.param = param
+        self.max_iter =max_iter
 
-    def _gradient(self, X, y):
-        pass
+    def _initialise_coefficients(self):
+        self._zeta = np.random.randn(self.n_features_in_ + 1, 1) * 0.1
 
-    def _hessian(self, X, y):
-        pass
+    def _sigmoid(self, u):
+        return 1 / (1 + np.exp(-u))
+
+    def expand_X(self, X):
+        return np.hstack([X, np.ones((X.shape[0], 1))])
+
+    def _z_mapping(self, X):
+        return self.expand_X(X) @ self._zeta
 
     def decision_function(self, X):
         # Check the estimator.fit(...) method has been called.
         check_is_fitted(self)
 
         # Validate and process input data
-        X = self._validate_data(X, reset=False)
+        X = validate_data(self, X, reset=False)
 
         # Use the decision function
-        # TODO
+        z = self._z_mapping(X)
+        s = self._sigmoid(z)
 
-        return np.random.random(X.shape[0])
+        return s
+
+    def _loss_function(self, X, y):
+
+        s = self.decision_function(X)
+
+        y_vec = y.reshape(-1, 1)
+
+        ll_vec = y_vec * np.log(s) + (1 - y_vec) * np.log(1 - s)
+
+        return -np.mean(ll_vec)
+
+    def _gradient(self, X, y):
+
+        X_expanded = self.expand_X(X)
+        s = self.decision_function(X)
+
+        return 1/self.n_samples_ * X_expanded.T @ (s - y.reshape(-1, 1))
+
+    def _hessian(self, X, y):
+        X_expanded = self.expand_X(X)
+        s = self.decision_function(X)
+        sigma_grad = s * (1 - s)
+
+        return 1/self.n_samples_ * X_expanded.T * (sigma_grad * (1 - y.reshape(-1, 1))) @ X_expanded
+
+    def _update_coefficients(self, delta_coefficients):
+
+        self._zeta -= delta_coefficients
 
     def fit(self, X, y):
         """
@@ -48,11 +86,14 @@ class LogisticRegression(ClassifierMixin, BaseEstimator):
         X: array-like of shape (n_samples, n_features)
         y: array-like of shape (n_samples,)
         """
-        # Validate and process input data
-        X, y = self._validate_data(X, y)
+        # Store number of features and number of samples
+        self.n_samples_, self.n_features_in_ = X.shape
 
-        # Store number of features
-        self.n_features_in_ = X.shape[1]
+        # Validate and process input data
+        X, y = validate_data(self, X, y)
+
+        # Initialise the coefficients
+        self._initialise_coefficients()
 
         # Process class labels
         self.classes_, y = np.unique(y, return_inverse=True)
@@ -115,7 +156,7 @@ class LogisticRegression(ClassifierMixin, BaseEstimator):
         check_is_fitted(self)
 
         # Validate the X data
-        X = self._validate_data(X, reset=False)
+        X = validate_data(X, reset=False)
 
         # Simple implementation for demonstration
         n_samples = X.shape[0]
@@ -135,7 +176,7 @@ class LogisticRegression(ClassifierMixin, BaseEstimator):
         check_is_fitted(self)
 
         # Validate the X data
-        X = self._validate_data(X, reset=False)
+        X = validate_data(X, reset=False)
 
         # Get probabilities and compute log
         proba = self.predict_proba(X)
@@ -153,7 +194,7 @@ class LogisticRegression(ClassifierMixin, BaseEstimator):
         """
 
         # Validate the X data
-        X = self._validate_data(X, reset=False)
+        X = validate_data(X, reset=False)
 
         y_pred = self.predict(X)
 
@@ -171,9 +212,49 @@ class LogisticRegression(ClassifierMixin, BaseEstimator):
         pass
 
         # Validate the X data
-        X = self._validate_data(X, reset=False)
+        X = validate_data(self, X, reset=False)
 
         return self.decision_function(X)
 
 if __name__ == "__main__":
-    check_estimator(LogisticRegression())
+    # TODO: Run this
+    # check_estimator(LogisticRegression())
+
+    # X, y = make_classification(n_features = 2, n_informative = 2, n_redundant=0)
+    # X, y = make_blobs(n_samples=100, n_features=2, centers=2, cluster_std=0.5, random_state=0)
+    X, y = make_circles(n_samples=1000,noise=0.01, random_state=0)
+    X = np.hstack([X, X[:, [0]] * X[:, [1]]])
+
+    print(X.shape, y.shape)
+
+    fig, ax = plt.subplots()
+    ax.scatter(X[:, 0], X[:, 1], c=y)
+    plt.show()
+
+    LR_inst = LogisticRegression(100)
+    LR_inst.fit(X, y)
+    lr_loss = []
+    lr_grad = LR_inst._gradient(X, y)
+    print(lr_grad.shape)
+
+    for i in range(1000):
+        lr_loss.append(LR_inst._loss_function(X, y))
+        lr_grad = LR_inst._gradient(X, y)
+
+        LR_inst._update_coefficients(1 * lr_grad)
+
+    plt.figure()
+    plt.plot(lr_loss)
+    plt.show()
+
+    X_grid, Y_grid = np.meshgrid(np.linspace(X[:, 0].min(), X[:, 0].max(), 100), np.linspace(X[:, 1].min(), X[:, 1].max(), 100))
+    X_test = np.hstack([X_grid.ravel().reshape(-1, 1), Y_grid.ravel().reshape(-1, 1)])
+    X_test = np.hstack([X_test, X_test[:, [0]] * X_test[:, [1]]])
+
+    print(X_test.shape)
+    D = LR_inst.score_samples(X_test)
+
+    plt.figure()
+    plt.contourf(X_grid, Y_grid, D.reshape(100, 100), cmap=plt.cm.jet)
+    plt.scatter(X[:, 0], X[:, 1], c=y)
+    plt.show()
