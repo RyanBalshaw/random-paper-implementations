@@ -52,25 +52,25 @@ class LogisticRegression(ClassifierMixin, BaseEstimator):
 
         ll_vec = y_vec * np.log(s) + (1 - y_vec) * np.log(1 - s)
 
-        return -np.mean(ll_vec)
+        return -np.mean(ll_vec) + 0.1 * np.linalg.norm(self._zeta)
 
     def _gradient(self, X, y):
 
         X_expanded = self.expand_X(X)
         s = self.decision_function(X)
 
-        return 1/self.n_samples_ * X_expanded.T @ (s - y.reshape(-1, 1))
+        return 1/self.n_samples_ * X_expanded.T @ (s - y.reshape(-1, 1)) + 0.1 * self._zeta
 
     def _hessian(self, X, y):
         X_expanded = self.expand_X(X)
         s = self.decision_function(X)
         sigma_grad = s * (1 - s)
-
-        return 1/self.n_samples_ * X_expanded.T * (sigma_grad * (1 - y.reshape(-1, 1))) @ X_expanded
+        inner_term = (sigma_grad * (1 - y.reshape(-1, 1))).T
+        return (1/self.n_samples_ * X_expanded.T * inner_term) @ X_expanded + 0.1
 
     def _update_coefficients(self, delta_coefficients):
 
-        self._zeta -= delta_coefficients
+        self._zeta += delta_coefficients
 
     def fit(self, X, y):
         """
@@ -221,9 +221,8 @@ if __name__ == "__main__":
     # check_estimator(LogisticRegression())
 
     # X, y = make_classification(n_features = 2, n_informative = 2, n_redundant=0)
-    # X, y = make_blobs(n_samples=100, n_features=2, centers=2, cluster_std=0.5, random_state=0)
-    X, y = make_circles(n_samples=1000,noise=0.01, random_state=0)
-    X = np.hstack([X, X[:, [0]] * X[:, [1]]])
+    X, y = make_blobs(n_samples=100, n_features=2, centers=2, cluster_std=0.5)
+    # X, y = make_circles(n_samples=1000,noise=0.01, random_state=0)
 
     print(X.shape, y.shape)
 
@@ -240,8 +239,9 @@ if __name__ == "__main__":
     for i in range(1000):
         lr_loss.append(LR_inst._loss_function(X, y))
         lr_grad = LR_inst._gradient(X, y)
+        lr_hess = LR_inst._hessian(X, y)
 
-        LR_inst._update_coefficients(1 * lr_grad)
+        LR_inst._update_coefficients(-0.01 * np.linalg.solve(lr_hess, lr_grad))
 
     plt.figure()
     plt.plot(lr_loss)
@@ -249,7 +249,6 @@ if __name__ == "__main__":
 
     X_grid, Y_grid = np.meshgrid(np.linspace(X[:, 0].min(), X[:, 0].max(), 100), np.linspace(X[:, 1].min(), X[:, 1].max(), 100))
     X_test = np.hstack([X_grid.ravel().reshape(-1, 1), Y_grid.ravel().reshape(-1, 1)])
-    X_test = np.hstack([X_test, X_test[:, [0]] * X_test[:, [1]]])
 
     print(X_test.shape)
     D = LR_inst.score_samples(X_test)
@@ -257,4 +256,8 @@ if __name__ == "__main__":
     plt.figure()
     plt.contourf(X_grid, Y_grid, D.reshape(100, 100), cmap=plt.cm.jet)
     plt.scatter(X[:, 0], X[:, 1], c=y)
+    plt.show()
+
+    plt.figure()
+    plt.scatter(np.arange(3), LR_inst._zeta[:, 0])
     plt.show()
