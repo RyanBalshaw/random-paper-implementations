@@ -3,11 +3,12 @@ from enum import Enum
 from typing import Optional
 
 import numpy as np
+from scipy.optimize import minimize
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.utils.validation import check_is_fitted, validate_data
-from scipy.optimize import minimize
 
 EPSILON = 1e-10
+
 
 class RegType(Enum):
     L1 = "L1"
@@ -97,7 +98,7 @@ class LogisticRegression(ClassifierMixin, BaseEstimator):
         regulariser_type: Optional[RegType] = None,
         alpha: Optional[float] = None,
         l1_ratio: Optional[float] = None,
-        optimiser: str = 'gradient_descent',
+        optimiser: str = "gradient_descent",
         tol: float = 1e-4,
     ):
         """
@@ -181,7 +182,9 @@ class LogisticRegression(ClassifierMixin, BaseEstimator):
 
         y_vec = y.reshape(-1, 1)
 
-        ll_vec = -1 * (y_vec * np.log(s + EPSILON) + (1 - y_vec) * np.log(1 - s + EPSILON))
+        ll_vec = -1 * (
+            y_vec * np.log(s + EPSILON) + (1 - y_vec) * np.log(1 - s + EPSILON)
+        )
 
         if aggregate:
             loss = np.mean(ll_vec)
@@ -266,7 +269,6 @@ class LogisticRegression(ClassifierMixin, BaseEstimator):
 
                 # For methods that support Hessian
                 if self.optimiser.lower() == "newton-cg":
-
                     result = minimize(
                         fun=self._objective_function,
                         x0=initial_coeffs,

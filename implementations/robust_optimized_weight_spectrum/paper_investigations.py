@@ -2,17 +2,17 @@ import os
 
 import numpy as np
 from matplotlib import pyplot as plt
+from sklearn.datasets import make_classification
 
-from sklearn.datasets import make_classification, make_blobs, make_circles
-
+from helper_methods.signal_processing_methods import square_envelope_spectrum
 from implementations.robust_optimized_weight_spectrum.paper_utils import (
     LogisticRegression,
     RegType,
 )
-from helper_methods.signal_processing_methods import square_envelope_spectrum, normalised_square_envelope_spectrum, fourier_spectrum, normalised_fourier_spectrum
+
 
 def simple_problem():
-    X, y = make_classification(n_features = 2, n_informative = 2, n_redundant=0)
+    X, y = make_classification(n_features=2, n_informative=2, n_redundant=0)
     # X, y = make_blobs(n_samples=100, n_features=2, centers=2, cluster_std=0.5)
     # X, y = make_circles(n_samples=1000,noise=0.01, random_state=0)
 
@@ -26,7 +26,7 @@ def simple_problem():
         regulariser_type=RegType.L1,
         alpha=0.001,
         optimiser="gradient_descent",  #
-        tol=1e-4
+        tol=1e-4,
     )
     model.fit(X, y)
 
@@ -40,7 +40,7 @@ def simple_problem():
 
     X_grid, Y_grid = np.meshgrid(
         np.linspace(X[:, 0].min(), X[:, 0].max(), 100),
-        np.linspace(X[:, 1].min(), X[:, 1].max(), 100)
+        np.linspace(X[:, 1].min(), X[:, 1].max(), 100),
     )
     X_test = np.hstack([X_grid.ravel().reshape(-1, 1), Y_grid.ravel().reshape(-1, 1)])
 
@@ -52,6 +52,7 @@ def simple_problem():
     plt.show()
 
     gradient_error, hessian_error = model.check_gradients_and_hessian(X, y)
+
 
 def signal_problem():
     base_dir = "../../Datasets/IMS/dataset_two/"
@@ -81,7 +82,7 @@ def signal_problem():
         regulariser_type=RegType.L1,
         alpha=0.00001,
         optimiser="gradient_descent",  # "newton-cg"
-        tol=1e-4
+        tol=1e-4,
     )
     model.fit(X, y)
 
@@ -104,13 +105,3 @@ if __name__ == "__main__":
 
     # simple_problem()
     signal_problem()
-
-
-
-
-
-
-
-
-
-
