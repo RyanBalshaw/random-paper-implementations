@@ -24,4 +24,3 @@ LaTex citation:
 ```
 
 ## Methodology summary
-

@@ -1,13 +1,7 @@
-import os
-
-from matplotlib import pyplot as plt
-from sklearn.utils.validation import check_is_fitted
-from sklearn.exceptions import NotFittedError
-from sklearn.utils.estimator_checks import check_estimator
-from sklearn.utils.validation import validate_data
-from sklearn.base import BaseEstimator, ClassifierMixin
 import numpy as np
-from sklearn.datasets import make_circles, make_moons, make_classification, make_blobs
+from sklearn.base import BaseEstimator, ClassifierMixin
+from sklearn.utils.validation import check_is_fitted, validate_data
+
 
 # https://scikit-learn.org/stable/developers/develop.html#estimators
 class LogisticRegression(ClassifierMixin, BaseEstimator):
@@ -19,7 +13,7 @@ class LogisticRegression(ClassifierMixin, BaseEstimator):
         even input validation, and the parameters should not be changed; which also
         means ideally they should not be mutable objects such as lists or dictionaries.
         """
-        self.max_iter =max_iter
+        self.max_iter = max_iter
 
     def _initialise_coefficients(self):
         self._zeta = np.random.randn(self.n_features_in_ + 1, 1) * 0.1
@@ -47,31 +41,30 @@ class LogisticRegression(ClassifierMixin, BaseEstimator):
         return s
 
     def _loss_function(self, X, y):
-
         s = self.decision_function(X)
 
         y_vec = y.reshape(-1, 1)
 
         ll_vec = y_vec * np.log(s) + (1 - y_vec) * np.log(1 - s)
 
-        return -np.mean(ll_vec) + 0.1 * np.linalg.norm(self._zeta)
+        return -np.mean(ll_vec) + 0.1 * np.linalg.norm(self._zeta, 1)
 
     def _gradient(self, X, y):
-
         X_expanded = self.expand_X(X)
         s = self.decision_function(X)
 
-        return 1/self.n_samples_ * X_expanded.T @ (s - y.reshape(-1, 1)) + 0.001 * self._zeta
+        return 1 / self.n_samples_ * X_expanded.T @ (
+            s - y.reshape(-1, 1)
+        ) + 0.001 * np.sign(self._zeta)
 
     def _hessian(self, X, y):
         X_expanded = self.expand_X(X)
         s = self.decision_function(X)
         sigma_grad = s * (1 - s)
         inner_term = (sigma_grad * (1 - y.reshape(-1, 1))).T
-        return (1/self.n_samples_ * X_expanded.T * inner_term) @ X_expanded + 0.001
+        return (1 / self.n_samples_ * X_expanded.T * inner_term) @ X_expanded + 0.001
 
     def _update_coefficients(self, delta_coefficients):
-
         self._zeta += delta_coefficients
 
     def fit(self, X, y):
@@ -168,7 +161,6 @@ class LogisticRegression(ClassifierMixin, BaseEstimator):
         proba = np.ones((n_samples, n_classes)) / n_classes
         return proba
 
-
     def predict_log_proba(self, X):
         """
         The natural logarithm of the output of predict_proba, provided to facilitate
@@ -217,66 +209,3 @@ class LogisticRegression(ClassifierMixin, BaseEstimator):
         X = validate_data(self, X, reset=False)
 
         return self.decision_function(X)
-
-if __name__ == "__main__":
-    # TODO: Run this
-    # check_estimator(LogisticRegression())
-
-    # X, y = make_classification(n_features = 2, n_informative = 2, n_redundant=0)
-    # X, y = make_blobs(n_samples=100, n_features=2, centers=2, cluster_std=0.5)
-    # X, y = make_circles(n_samples=1000,noise=0.01, random_state=0)
-    base_dir = "../Datasets/IMS/dataset_two/"
-    file_list = sorted(os.listdir(base_dir))
-
-    f1 = np.loadtxt(os.path.join(base_dir, file_list[0]))
-    f2 = np.loadtxt(os.path.join(base_dir, file_list[900]))
-
-    N = f1.shape[0]
-    Fs = 20480
-    X1 =  2/N *np.abs(np.fft.fft(f1[:, 0]))[:N//2]
-    X2 = 2/N * np.abs(np.fft.fft(f2[:, 0]))[:N//2]
-    freq = np.fft.fftfreq(N, 1/Fs)[:N//2]
-    X = np.vstack([X1.reshape(1, -1), X2.reshape(1, -1)])
-    y = np.array([0, 1])
-
-
-    print(X.shape, y.shape)
-
-    plt.figure()
-    plt.plot(freq, X2)
-    plt.plot(freq, X1)
-    # fig, ax = plt.subplots()
-    # ax.scatter(X[:, 0], X[:, 1], c=y)
-    # plt.show()
-
-    LR_inst = LogisticRegression(100)
-    LR_inst.fit(X, y)
-    lr_loss = []
-    lr_grad = LR_inst._gradient(X, y)
-    print(lr_grad.shape)
-
-    for i in range(1000):
-        lr_loss.append(LR_inst._loss_function(X, y))
-        lr_grad = LR_inst._gradient(X, y)
-        # lr_hess = LR_inst._hessian(X, y)
-
-        LR_inst._update_coefficients(-0.5 * lr_grad)  # np.linalg.solve(lr_hess, lr_grad)
-
-    plt.figure()
-    plt.plot(lr_loss)
-    plt.show()
-
-    # X_grid, Y_grid = np.meshgrid(np.linspace(X[:, 0].min(), X[:, 0].max(), 100), np.linspace(X[:, 1].min(), X[:, 1].max(), 100))
-    # X_test = np.hstack([X_grid.ravel().reshape(-1, 1), Y_grid.ravel().reshape(-1, 1)])
-    #
-    # print(X_test.shape)
-    # D = LR_inst.score_samples(X_test)
-
-    # plt.figure()
-    # plt.contourf(X_grid, Y_grid, D.reshape(100, 100), cmap=plt.cm.jet)
-    # plt.scatter(X[:, 0], X[:, 1], c=y)
-    # plt.show()
-
-    plt.figure()
-    plt.plot(np.arange(len(LR_inst._zeta[:, 0])), LR_inst._zeta[:, 0], lw = 0.4)
-    plt.show()
