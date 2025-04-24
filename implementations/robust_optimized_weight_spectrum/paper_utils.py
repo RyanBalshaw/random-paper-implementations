@@ -1,21 +1,24 @@
+from abc import ABC, abstractmethod
+from enum import Enum
 from typing import Optional
 
 import numpy as np
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.utils.validation import check_is_fitted, validate_data
+from scipy.optimize import minimize
 
-from abc import ABC, abstractmethod
-from enum import Enum
+EPSILON = 1e-10
 
 class RegType(Enum):
     L1 = "L1"
     L2 = "L2"
     ELASTIC = "ELASTIC"
 
-class BaseRegulariser(ABC):
 
+class BaseRegulariser(ABC):
     def __init__(self, alpha: float):
         self.alpha = alpha
+        assert self.alpha >= 0, "alpha must be non-negative."
 
     @abstractmethod
     def loss(self, coefficients):
@@ -28,6 +31,7 @@ class BaseRegulariser(ABC):
     @abstractmethod
     def hessian(self, coefficients):
         pass
+
 
 class L1Regulariser(BaseRegulariser):
     def loss(self, coefficients):
@@ -41,13 +45,15 @@ class L1Regulariser(BaseRegulariser):
     def hessian(self, coefficients):
         # L1 regularization doesn't have a true Hessian (non-differentiable at 0)
         # But for practical purposes:
-        return 0.0001 * np.eye(len(coefficients))  # Small constant for numerical stability
+        return 0.0001 * np.eye(
+            len(coefficients)
+        )  # Small constant for numerical stability
 
 
 class L2Regulariser(BaseRegulariser):
     def loss(self, coefficients):
         # alpha * w^Tw
-        return self.alpha * np.sum(coefficients ** 2)
+        return self.alpha * np.sum(coefficients**2)
 
     def gradient(self, coefficients):
         # alpha * 2 * w
@@ -82,24 +88,54 @@ class ElasticNetRegulariser(BaseRegulariser):
         l2 = self._l2.hessian(coefficients)
         return self.l1_ratio * l1 + (1 - self.l1_ratio) * l2
 
-# https://scikit-learn.org/stable/developers/develop.html#estimators
+
 class LogisticRegression(ClassifierMixin, BaseEstimator):
-    def __init__(self, learning_rate: float = 0.01, max_iter:int=100, regulariser_type: Optional[RegType] = None, alpha: Optional[float] = None, l1_ratio: Optional[float] = None):
+    def __init__(
+        self,
+        learning_rate: float = 0.01,
+        max_iter: int = 100,
+        regulariser_type: Optional[RegType] = None,
+        alpha: Optional[float] = None,
+        l1_ratio: Optional[float] = None,
+        optimiser: str = 'gradient_descent',
+        tol: float = 1e-4,
+    ):
         """
-        Every keyword argument accepted by __init__ should correspond to an attribute
-        on the instance. Scikit-learn relies on this to find the relevant attributes to
-        set on an estimator when doing model selection. There should be no logic, not
-        even input validation, and the parameters should not be changed; which also
-        means ideally they should not be mutable objects such as lists or dictionaries.
+        https://scikit-learn.org/stable/developers/develop.html#estimators
+
+        Parameters:
+        -----------
+        learning_rate : float, default=0.01
+            Step size for gradient descent
+
+        max_iter : int, default=100
+            Maximum number of iterations for optimisation
+
+        regulariser_type : RegType, default=None
+            Type of regularisation to use
+
+        alpha : float, default=None
+            Regularisation strength
+
+        l1_ratio : float, default=None
+            Ratio of L1 regularisation for ElasticNet
+
+        optimiser : str, default='gradient_descent'
+            Optimisation algorithm to use: 'gradient_descent', 'bfgs', 'l-bfgs-b',
+            'newton-cg', etc.
+
+        tol : float, default=1e-4
+            Tolerance for stopping criterion
         """
         self.learning_rate = learning_rate
         self.max_iter = max_iter
         self.regulariser_type = regulariser_type
         self.alpha = alpha
         self.l1_ratio = l1_ratio
+        self.optimiser = optimiser
+        self.tol = tol
 
     def _get_regulariser(self):
-
         if self.regulariser_type is None:
             self.regulariser = None
             return
@@ -116,7 +152,7 @@ class LogisticRegression(ClassifierMixin, BaseEstimator):
                 raise ValueError(f"Unknown regulariser type: {self.regulariser_type}")
 
     def _initialise_coefficients(self):
-        self._zeta = np.random.randn(self.n_features_in_ + 1, 1) * 0.1
+        self._zeta = np.random.randn(self.n_features_in_ + 1, 1) * 0.01
 
     def _sigmoid(self, u):
         return 1 / (1 + np.exp(-u))
@@ -145,7 +181,7 @@ class LogisticRegression(ClassifierMixin, BaseEstimator):
 
         y_vec = y.reshape(-1, 1)
 
-        ll_vec = -1 * (y_vec * np.log(s) + (1 - y_vec) * np.log(1 - s))
+        ll_vec = -1 * (y_vec * np.log(s + EPSILON) + (1 - y_vec) * np.log(1 - s + EPSILON))
 
         if aggregate:
             loss = np.mean(ll_vec)
@@ -162,9 +198,7 @@ class LogisticRegression(ClassifierMixin, BaseEstimator):
         X_expanded = self.expand_X(X)
         s = self.decision_function(X)
 
-        grad = 1 / self.n_samples_ * X_expanded.T @ (
-            s - y.reshape(-1, 1)
-        )
+        grad = 1 / self.n_samples_ * X_expanded.T @ (s - y.reshape(-1, 1))
 
         if self.regulariser:
             reg_grad = self.regulariser.gradient(self._zeta)
@@ -176,9 +210,9 @@ class LogisticRegression(ClassifierMixin, BaseEstimator):
         X_expanded = self.expand_X(X)
         s = self.decision_function(X)
         sigma_grad = s * (1 - s)
-        inner_term = (sigma_grad * (1 - y.reshape(-1, 1))).T
+        weighted_X = sigma_grad * X_expanded
 
-        hess =  (1 / self.n_samples_ * X_expanded.T * inner_term) @ X_expanded
+        hess = (1 / self.n_samples_) * X_expanded.T @ weighted_X
 
         if self.regulariser:
             reg_hess = self.regulariser.hessian(self._zeta)
@@ -188,6 +222,84 @@ class LogisticRegression(ClassifierMixin, BaseEstimator):
 
     def _update_coefficients(self, delta_coefficients):
         self._zeta += delta_coefficients
+
+    def _objective_function(self, coefficients, X, y):
+        """Objective function for scipy.optimize.minimize"""
+        # Reshape the coefficients to the expected shape
+        self._zeta = coefficients.reshape(-1, 1)
+        return self._loss_function(X, y)
+
+    def _objective_gradient(self, coefficients, X, y):
+        """Gradient of the objective function for scipy.optimize.minimize"""
+        # Reshape the coefficients to the expected shape
+        self._zeta = coefficients.reshape(-1, 1)
+        return self._gradient(X, y).flatten()
+
+    def _objective_hessian(self, coefficients, X, y):
+        """Gradient of the objective function for scipy.optimize.minimize"""
+        # Reshape the coefficients to the expected shape
+        self._zeta = coefficients.reshape(-1, 1)
+        return self._hessian(X, y)
+
+    def _optimise_coefficients(self, X, y):
+        if self.optimiser.lower() == "gradient_descent":
+            # Standard gradient descent
+            self._loss_values = []
+            for _ in range(self.max_iter):
+                # Calculate loss
+                loss = self._loss_function(X, y)
+                self._loss_values.append(loss)
+
+                # Calculate gradient
+                grad = self._gradient(X, y)
+
+                # Update coefficients
+                delta_zeta = -1 * self.learning_rate * grad
+                self._update_coefficients(delta_zeta)
+        else:
+            # Use scipy.optimize.minimize
+            initial_coeffs = self._zeta.flatten()  # Flatten for scipy.optimize
+            method_args = (X, y)
+
+            if self.optimiser.lower() in ["bfgs", "l-bfgs-b", "newton-cg"]:
+                options = {"maxiter": self.max_iter, "disp": False}
+
+                # For methods that support Hessian
+                if self.optimiser.lower() == "newton-cg":
+
+                    result = minimize(
+                        fun=self._objective_function,
+                        x0=initial_coeffs,
+                        args=method_args,
+                        method=self.optimiser,
+                        jac=self._objective_gradient,
+                        hess=self._objective_hessian,
+                        options=options,
+                    )
+                else:
+                    result = minimize(
+                        fun=self._objective_function,
+                        x0=initial_coeffs,
+                        args=method_args,
+                        method=self.optimiser,
+                        jac=self._objective_gradient,
+                        options=options,
+                    )
+            else:
+                # For methods that don't need gradient
+                options = {"maxiter": self.max_iter, "disp": False}
+                result = minimize(
+                    fun=self._objective_function,
+                    x0=initial_coeffs,
+                    args=method_args,
+                    method=self.optimiser,
+                    options=options,
+                )
+
+            # Store optimization results
+            self._optimization_result = result
+            self._zeta = result.x.reshape(-1, 1)
+            self._loss_values = [result.fun]  # Just the final loss value
 
     def fit(self, X, y):
         """
@@ -219,21 +331,7 @@ class LogisticRegression(ClassifierMixin, BaseEstimator):
         self.classes_, y = np.unique(y, return_inverse=True)
 
         # Fit estimator using gradient descent
-        # TODO: Extend to different optimisiation approaches
-
-        self._loss_values = []
-        for _ in range(self.max_iter):
-
-            # Calculate loss
-            loss = self._loss_function(X, y)
-            self._loss_values.append(loss)
-
-            # Calculate gradient
-            grad = self._gradient(X, y)
-
-            # Update coefficients
-            delta_zeta = -1 * self.learning_rate * grad
-            self._update_coefficients(delta_zeta)
+        self._optimise_coefficients(X, y)
 
         # Mark estimator as fitted
         self.is_fitted_ = True
@@ -290,13 +388,9 @@ class LogisticRegression(ClassifierMixin, BaseEstimator):
         check_is_fitted(self)
 
         # Validate the X data
-        X = validate_data(X, reset=False)
+        X = validate_data(self, X, reset=False)
 
-        # Simple implementation for demonstration
-        n_samples = X.shape[0]
-        n_classes = len(self.classes_)
-
-        # Create uniform probabilities for demonstration
+        # Get probabilities
         proba = self.decision_function(X)
         return proba
 
@@ -309,7 +403,7 @@ class LogisticRegression(ClassifierMixin, BaseEstimator):
         check_is_fitted(self)
 
         # Validate the X data
-        X = validate_data(X, reset=False)
+        X = validate_data(self, X, reset=False)
 
         # Get probabilities and compute log
         proba = self.predict_proba(X)
@@ -332,3 +426,174 @@ class LogisticRegression(ClassifierMixin, BaseEstimator):
         y_pred = self.predict(X)
 
         return np.mean(y_pred == y)
+
+    def check_gradient_finite_diff(self, X, y, step_size=1e-6):
+        """
+        Checks the gradient implementation using finite differences.
+
+        Parameters
+        ----------
+        X : ndarray
+            Input features of shape (n_samples, n_features)
+        y : ndarray
+            Target values of shape (n_samples,)
+        step_size : float, default=1e-6
+            Step size for finite difference approximation
+
+        Returns
+        -------
+        analytical_grad : ndarray
+            Gradient computed using the analytical formula
+        numerical_grad : ndarray
+            Gradient computed using finite differences
+        rel_error : float
+            Relative error between analytical and numerical gradients
+        """
+        # Store current coefficients
+        original_zeta = self._zeta.copy()
+
+        # Calculate analytical gradient
+        analytical_grad = self._gradient(X, y)
+
+        # Calculate numerical gradient
+        numerical_grad = np.zeros_like(self._zeta)
+        for i in range(len(self._zeta)):
+            # Forward step
+            self._zeta = original_zeta.copy()
+            self._zeta[i] += step_size
+            loss_plus = self._loss_function(X, y)
+
+            # Backward step
+            self._zeta = original_zeta.copy()
+            self._zeta[i] -= step_size
+            loss_minus = self._loss_function(X, y)
+
+            # Central difference approximation
+            numerical_grad[i] = (loss_plus - loss_minus) / (2 * step_size)
+
+        # Restore original coefficients
+        self._zeta = original_zeta
+
+        # Calculate relative error
+        abs_diff = np.linalg.norm(analytical_grad - numerical_grad)
+        abs_grad = np.linalg.norm(analytical_grad)
+        rel_error = abs_diff / (abs_grad + EPSILON)
+
+        return analytical_grad, numerical_grad, rel_error
+
+    def check_hessian_finite_diff(self, X, y, step_size=1e-6):
+        """
+        Checks the Hessian implementation using finite differences.
+
+        Parameters
+        ----------
+        X : ndarray
+            Input features of shape (n_samples, n_features)
+        y : ndarray
+            Target values of shape (n_samples,)
+        step_size : float, default=1e-6
+            Step size for finite difference approximation
+
+        Returns
+        -------
+        analytical_hess : ndarray
+            Hessian computed using the analytical formula
+        numerical_hess : ndarray
+            Hessian computed using finite differences
+        rel_error : float
+            Relative error between analytical and numerical Hessians
+        """
+        # Store current coefficients
+        original_zeta = self._zeta.copy()
+
+        # Calculate analytical Hessian
+        analytical_hess = self._hessian(X, y)
+
+        # Calculate numerical Hessian using finite differences on the gradient
+        n_params = len(self._zeta)
+        numerical_hess = np.zeros((n_params, n_params))
+
+        for i in range(n_params):
+            for j in range(n_params):
+                # Forward step for parameter i and j
+                self._zeta = original_zeta.copy()
+                self._zeta[i] += step_size
+                self._zeta[j] += step_size
+                f1 = self._loss_function(X, y)
+
+                # Backward step for parameter i and j
+                self._zeta = original_zeta.copy()
+                self._zeta[i] -= step_size
+                self._zeta[j] -= step_size
+                f2 = self._loss_function(X, y)
+
+                # Symmetrical step for parameter i and j
+                self._zeta = original_zeta.copy()
+                self._zeta[i] += step_size
+                self._zeta[j] -= step_size
+                f3 = self._loss_function(X, y)
+
+                # Symmetrical step for parameter i and j
+                self._zeta = original_zeta.copy()
+                self._zeta[i] -= step_size
+                self._zeta[j] += step_size
+                f4 = self._loss_function(X, y)
+
+                # Compute the i-th column of the Hessian using central difference
+                numerical_hess[i, j] = (f1 + f2 - f3 - f4) / (4 * step_size**2)
+
+        # Restore original coefficients
+        self._zeta = original_zeta
+
+        # Calculate relative error
+        abs_diff = np.linalg.norm(analytical_hess - numerical_hess)
+        abs_hess = np.linalg.norm(analytical_hess)
+        rel_error = abs_diff / (abs_hess + EPSILON)
+
+        return analytical_hess, numerical_hess, rel_error
+
+    def check_gradients_and_hessian(self, X, y, step_size=1e-6, verbose=True):
+        """
+        Performs gradient and Hessian verification using finite differences.
+
+        Parameters
+        ----------
+        X : ndarray
+            Input features of shape (n_samples, n_features)
+        y : ndarray
+            Target values of shape (n_samples,)
+        step_size : float, default=1e-6
+            Step size for finite difference approximation
+        verbose : bool, default=True
+            Whether to print results
+
+        Returns
+        -------
+        grad_err : float
+            Relative error for gradient
+        hess_err : float
+            Relative error for Hessian
+        """
+        # Check the gradient
+        _, _, grad_err = self.check_gradient_finite_diff(X, y, step_size)
+
+        if verbose:
+            print(f"Gradient verification - relative error: {grad_err:.6e}")
+
+            if grad_err < 1e-5:
+                print("Gradient implementation appears correct!")
+            else:
+                print("Gradient implementation might have issues!")
+
+        # Check the Hessian
+        _, _, hess_err = self.check_hessian_finite_diff(X, y, step_size)
+
+        if verbose:
+            print(f"Hessian verification - relative error: {hess_err:.6e}")
+
+            if hess_err < 1e-3:
+                print("Hessian implementation appears correct!")
+            else:
+                print("Hessian implementation might have issues!")
+
+        return grad_err, hess_err
