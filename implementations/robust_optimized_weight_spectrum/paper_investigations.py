@@ -4,7 +4,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 
 from implementations.robust_optimized_weight_spectrum.paper_utils import (
-    LogisticRegression,
+    LogisticRegression, RegType
 )
 
 if __name__ == "__main__":
@@ -17,7 +17,7 @@ if __name__ == "__main__":
     base_dir = "../../Datasets/IMS/dataset_two/"
     file_list = sorted(os.listdir(base_dir))
 
-    f1 = np.loadtxt(os.path.join(base_dir, file_list[600]))
+    f1 = np.loadtxt(os.path.join(base_dir, file_list[200]))
     f2 = np.loadtxt(os.path.join(base_dir, file_list[700]))
 
     N = f1.shape[0]
@@ -37,23 +37,11 @@ if __name__ == "__main__":
     # ax.scatter(X[:, 0], X[:, 1], c=y)
     # plt.show()
 
-    LR_inst = LogisticRegression(100)
+    LR_inst = LogisticRegression(learning_rate = 1, max_iter=2000, regulariser_type = RegType.L1, alpha = 0.001)
     LR_inst.fit(X, y)
-    lr_loss = []
-    lr_grad = LR_inst._gradient(X, y)
-    print(lr_grad.shape)
-
-    for i in range(500):
-        lr_loss.append(LR_inst._loss_function(X, y))
-        lr_grad = LR_inst._gradient(X, y)
-        # lr_hess = LR_inst._hessian(X, y)
-
-        LR_inst._update_coefficients(
-            -0.5 * lr_grad
-        )  # np.linalg.solve(lr_hess, lr_grad)
 
     plt.figure()
-    plt.plot(lr_loss)
+    plt.plot(LR_inst._loss_values)
     plt.show()
 
     # X_grid, Y_grid = np.meshgrid(
