@@ -1,7 +1,11 @@
 import os
 
-from matplotlib import pyplot as plt
 import numpy as np
+from matplotlib import pyplot as plt
+
+from implementations.robust_optimized_weight_spectrum.paper_utils import (
+    LogisticRegression,
+)
 
 if __name__ == "__main__":
     # TODO: Run this
@@ -10,7 +14,7 @@ if __name__ == "__main__":
     # X, y = make_classification(n_features = 2, n_informative = 2, n_redundant=0)
     # X, y = make_blobs(n_samples=100, n_features=2, centers=2, cluster_std=0.5)
     # X, y = make_circles(n_samples=1000,noise=0.01, random_state=0)
-    base_dir = "../Datasets/IMS/dataset_two/"
+    base_dir = "../../Datasets/IMS/dataset_two/"
     file_list = sorted(os.listdir(base_dir))
 
     f1 = np.loadtxt(os.path.join(base_dir, file_list[600]))
@@ -52,7 +56,10 @@ if __name__ == "__main__":
     plt.plot(lr_loss)
     plt.show()
 
-    # X_grid, Y_grid = np.meshgrid(np.linspace(X[:, 0].min(), X[:, 0].max(), 100), np.linspace(X[:, 1].min(), X[:, 1].max(), 100))
+    # X_grid, Y_grid = np.meshgrid(
+    #     np.linspace(X[:, 0].min(), X[:, 0].max(), 100),
+    #     np.linspace(X[:, 1].min(), X[:, 1].max(), 100)
+    # )
     # X_test = np.hstack([X_grid.ravel().reshape(-1, 1), Y_grid.ravel().reshape(-1, 1)])
     #
     # print(X_test.shape)
