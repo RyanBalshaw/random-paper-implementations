@@ -9,7 +9,7 @@ repos:
           - id: end-of-file-fixer #This hooks ensures that all files end in a newline and only a newline.
           - id: mixed-line-ending # This hook replaces or checks mixed line ending.
           - id: check-yaml #This hook will attempt to load all yaml files and verify their syntax
-          - id: check-added-large-files # this hook will prevent  extremellarge files from being committed.
+          - id: check-added-large-files # this hook will prevent extremely large files from being committed.
             args: [--maxkb=20000]
     - repo: https://github.com/jumanjihouse/pre-commit-hook-yamlfmt
       rev: 0.2.3
@@ -41,6 +41,14 @@ repos:
           - id: detect-secrets
             args: [--baseline, .secrets.baseline]    # TODO(potential): Include GCloud token regex
             exclude: package.lock.json
+    - repo: https://github.com/astral-sh/uv-pre-commit
+      # uv version.
+      rev: 0.6.16
+      hooks:
+          - id: uv-lock
+          - id: uv-export
+            args: [--frozen, --no-hashes, --no-emit-project, --all-groups, --output-file=requirements-dev.txt]
+
 #  - repo: https://github.com/econchick/interrogate
 #    rev: 1.7.0
 #    hooks:
