@@ -367,6 +367,10 @@ class LogisticRegression(ClassifierMixin, BaseEstimator):
 
         return self.classes_[1 * (D > 0.5)]
 
+    def predict_log_odds(self, X):
+        # Use the z-mapping
+        return self._z_mapping(X)
+
     def predict_proba(self, X):
         """
         A method in classifiers and clusterers that can return probability estimates
