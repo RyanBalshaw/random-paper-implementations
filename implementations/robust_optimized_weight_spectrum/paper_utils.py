@@ -5,6 +5,7 @@ from typing import Optional
 import numpy as np
 from scipy.optimize import minimize
 from sklearn.base import BaseEstimator, ClassifierMixin
+from sklearn.utils.estimator_checks import check_estimator
 from sklearn.utils.validation import check_is_fitted, validate_data
 
 EPSILON = 1e-10
@@ -603,3 +604,7 @@ class LogisticRegression(ClassifierMixin, BaseEstimator):
                 print("Hessian implementation might have issues!")
 
         return grad_err, hess_err
+
+
+if __name__ == "__main__":
+    check_estimator(LogisticRegression())
