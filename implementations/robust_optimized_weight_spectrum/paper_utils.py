@@ -94,13 +94,15 @@ class ElasticNetRegulariser(BaseRegulariser):
 class LogisticRegression(ClassifierMixin, BaseEstimator):
     def __init__(
         self,
-        learning_rate: float = 0.01,
-        max_iter: int = 100,
+        learning_rate: float = 1,
+        max_iter: int = 500,
         regulariser_type: Optional[RegType] = None,
         alpha: Optional[float] = None,
         l1_ratio: Optional[float] = None,
         optimiser: str = "gradient_descent",
-        tol: float = 1e-4,
+        tol_iter: float = 1e-6,
+        tol_term: float = 1e-8,
+        initial_coeffs: Optional[np.ndarray] = None,
     ):
         """
         https://scikit-learn.org/stable/developers/develop.html#estimators
@@ -129,32 +131,43 @@ class LogisticRegression(ClassifierMixin, BaseEstimator):
         tol : float, default=1e-4
             Tolerance for stopping criterion
         """
+        super().__init__()
+        # self.is_fitted_ = None
+        # self.classes_ = None
+        # self.n_samples_ = None
+        # self.n_features_in_ = None
         self.learning_rate = learning_rate
         self.max_iter = max_iter
         self.regulariser_type = regulariser_type
         self.alpha = alpha
         self.l1_ratio = l1_ratio
         self.optimiser = optimiser
-        self.tol = tol
+        self.tol_iter = tol_iter
+        self.tol_term = tol_term
+        self.initial_coeffs = initial_coeffs
 
     def _get_regulariser(self):
         if self.regulariser_type is None:
-            self.regulariser = None
+            self._regulariser = None
             return
         else:
             if self.regulariser_type == RegType.L1:
-                self.regulariser = L1Regulariser(self.alpha)
+                self._regulariser = L1Regulariser(self.alpha)
 
             elif self.regulariser_type == RegType.L2:
-                self.regulariser = L2Regulariser(self.alpha)
+                self._regulariser = L2Regulariser(self.alpha)
 
             elif self.regulariser_type == RegType.ELASTIC:
-                self.regulariser = ElasticNetRegulariser(self.alpha, self.l1_ratio)
+                self._regulariser = ElasticNetRegulariser(self.alpha, self.l1_ratio)
             else:
                 raise ValueError(f"Unknown regulariser type: {self.regulariser_type}")
 
     def _initialise_coefficients(self):
-        self._zeta = np.random.randn(self.n_features_in_ + 1, 1) * 0.01
+        if not self.initial_coeffs:
+            self._zeta = np.random.randn(self.n_features_in_ + 1, 1) * 0.01
+
+        else:
+            self.set_coefficients(self.initial_coeffs)
 
     def _sigmoid(self, u):
         return 1 / (1 + np.exp(-u))
@@ -192,8 +205,8 @@ class LogisticRegression(ClassifierMixin, BaseEstimator):
         else:
             loss = ll_vec
 
-        if self.regulariser and not aggregate:
-            reg_loss = self.regulariser.loss(self._zeta)
+        if self._regulariser and not aggregate:
+            reg_loss = self._regulariser.loss(self._zeta)
             return loss + reg_loss
 
         return loss
@@ -204,8 +217,8 @@ class LogisticRegression(ClassifierMixin, BaseEstimator):
 
         grad = 1 / self.n_samples_ * X_expanded.T @ (s - y.reshape(-1, 1))
 
-        if self.regulariser:
-            reg_grad = self.regulariser.gradient(self._zeta)
+        if self._regulariser:
+            reg_grad = self._regulariser.gradient(self._zeta)
             return grad + reg_grad
 
         return grad
@@ -218,8 +231,8 @@ class LogisticRegression(ClassifierMixin, BaseEstimator):
 
         hess = (1 / self.n_samples_) * X_expanded.T @ weighted_X
 
-        if self.regulariser:
-            reg_hess = self.regulariser.hessian(self._zeta)
+        if self._regulariser:
+            reg_hess = self._regulariser.hessian(self._zeta)
             return hess + reg_hess
 
         return hess
@@ -246,13 +259,18 @@ class LogisticRegression(ClassifierMixin, BaseEstimator):
         return self._hessian(X, y)
 
     def _optimise_coefficients(self, X, y):
+        # Define loss at iteration zero
+        loss_prev = np.inf
+
         if self.optimiser.lower() == "gradient_descent":
             # Standard gradient descent
             self._loss_values = []
-            for _ in range(self.max_iter):
+            self._iteration_steps = None
+
+            for cnt in range(self.max_iter):
                 # Calculate loss
-                loss = self._loss_function(X, y)
-                self._loss_values.append(loss)
+                loss_current = self._loss_function(X, y)
+                self._loss_values.append(loss_current)
 
                 # Calculate gradient
                 grad = self._gradient(X, y)
@@ -260,6 +278,24 @@ class LogisticRegression(ClassifierMixin, BaseEstimator):
                 # Update coefficients
                 delta_zeta = -1 * self.learning_rate * grad
                 self._update_coefficients(delta_zeta)
+
+                # Check loss difference
+                loss_diff = np.abs(loss_current - loss_prev)
+
+                # Handle the definition of the iteration steps
+                if loss_diff < self.tol_iter:
+                    # Set steps to solution
+                    self._iteration_steps = cnt
+                else:
+                    loss_prev = loss_current
+
+                # Handle the stopping criteria
+                if loss_diff < self.tol_term:
+                    break
+
+            if self._iteration_steps is None:
+                self._iteration_steps = self.max_iter
+
         else:
             # Use scipy.optimize.minimize
             initial_coeffs = self._zeta.flatten()  # Flatten for scipy.optimize
@@ -303,6 +339,7 @@ class LogisticRegression(ClassifierMixin, BaseEstimator):
             self._optimization_result = result
             self._zeta = result.x.reshape(-1, 1)
             self._loss_values = [result.fun]  # Just the final loss value
+            self._iteration_steps = result.nit
 
     def fit(self, X, y):
         """
@@ -318,11 +355,12 @@ class LogisticRegression(ClassifierMixin, BaseEstimator):
         X: array-like of shape (n_samples, n_features)
         y: array-like of shape (n_samples,)
         """
-        # Store number of features and number of samples
-        self.n_samples_, self.n_features_in_ = X.shape
 
         # Validate and process input data
         X, y = validate_data(self, X, y)
+
+        # Store number of features and number of samples
+        self.n_samples_, self.n_features_in_ = X.shape
 
         # Set up regularizer
         self._get_regulariser()
@@ -366,7 +404,19 @@ class LogisticRegression(ClassifierMixin, BaseEstimator):
         # Use the decision function to get the mapping of the data
         D = self.decision_function(X)
 
-        return self.classes_[1 * (D > 0.5)]
+        return self.classes_[1 * (D[:, 0] > 0.5)]
+
+    def get_coefficients(self):
+        return np.ravel(self._zeta)
+
+    def set_coefficients(self, coefficients):
+        num_given_coeffs = len(np.ravel(self.initial_coeffs))
+        assert num_given_coeffs == self.n_features_in_ + 1, (
+            f"Provided initial coefficients must have length equal to "
+            f"n_features_in_ + 1, currently: {num_given_coeffs} "
+            f"({np.shape(self.initial_coeffs)})."
+        )
+        self._zeta = np.reshape(self.initial_coeffs, (self.n_features_in_ + 1, 1))
 
     def predict_log_odds(self, X):
         # Use the z-mapping
@@ -398,8 +448,11 @@ class LogisticRegression(ClassifierMixin, BaseEstimator):
         X = validate_data(self, X, reset=False)
 
         # Get probabilities
-        proba = self.decision_function(X)
-        return proba
+        prob_class0 = self.decision_function(X)[:, 0]
+        proba_class1 = 1 - prob_class0
+
+        # Return a 2D array with shape (n_samples, n_classes)
+        return np.column_stack([prob_class0, proba_class1])
 
     def predict_log_proba(self, X):
         """
@@ -428,7 +481,7 @@ class LogisticRegression(ClassifierMixin, BaseEstimator):
         """
 
         # Validate the X data
-        X = validate_data(X, reset=False)
+        X = validate_data(self, X, reset=False)
 
         y_pred = self.predict(X)
 
@@ -607,4 +660,4 @@ class LogisticRegression(ClassifierMixin, BaseEstimator):
 
 
 if __name__ == "__main__":
-    check_estimator(LogisticRegression())
+    check_estimator(LogisticRegression())  # WIP: Still buggy
