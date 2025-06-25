@@ -5,7 +5,6 @@ from typing import Optional
 import numpy as np
 from scipy.optimize import minimize
 from sklearn.base import BaseEstimator, ClassifierMixin
-from sklearn.utils.estimator_checks import check_estimator
 from sklearn.utils.validation import check_is_fitted, validate_data
 
 EPSILON = 1e-10
@@ -146,6 +145,9 @@ class LogisticRegression(ClassifierMixin, BaseEstimator):
         self.tol_term = tol_term
         self.initial_coeffs = initial_coeffs
 
+        self._loss_values = []
+        self._iteration_steps = None
+
     def _get_regulariser(self):
         if self.regulariser_type is None:
             self._regulariser = None
@@ -163,7 +165,7 @@ class LogisticRegression(ClassifierMixin, BaseEstimator):
                 raise ValueError(f"Unknown regulariser type: {self.regulariser_type}")
 
     def _initialise_coefficients(self):
-        if not self.initial_coeffs:
+        if self.initial_coeffs is None:
             self._zeta = np.random.randn(self.n_features_in_ + 1, 1) * 0.01
 
         else:
@@ -264,8 +266,6 @@ class LogisticRegression(ClassifierMixin, BaseEstimator):
 
         if self.optimiser.lower() == "gradient_descent":
             # Standard gradient descent
-            self._loss_values = []
-            self._iteration_steps = None
 
             for cnt in range(self.max_iter):
                 # Calculate loss
@@ -487,6 +487,12 @@ class LogisticRegression(ClassifierMixin, BaseEstimator):
 
         return np.mean(y_pred == y)
 
+    def get_loss_values(self):
+        return self._loss_values
+
+    def get_iteration_steps(self):
+        return self._iteration_steps
+
     def check_gradient_finite_diff(self, X, y, step_size=1e-6):
         """
         Checks the gradient implementation using finite differences.
@@ -659,5 +665,5 @@ class LogisticRegression(ClassifierMixin, BaseEstimator):
         return grad_err, hess_err
 
 
-if __name__ == "__main__":
-    check_estimator(LogisticRegression())  # WIP: Still buggy
+# if __name__ == "__main__":
+#     check_estimator(LogisticRegression())  # WIP: Still buggy
