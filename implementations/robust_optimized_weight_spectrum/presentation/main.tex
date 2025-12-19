@@ -1,0 +1,468 @@
+%----------------------------------------------------------------------------------------
+%	PACKAGES AND THEMES
+%----------------------------------------------------------------------------------------
+\documentclass[aspectratio=169,xcolor=dvipsnames]{beamer}
+\usetheme{SimplePlusAIC}
+
+\usepackage{hyperref}
+\usepackage{graphicx} % Allows including images
+\usepackage{booktabs} % Allows the use of \toprule, \midrule and  \bottomrule in tables
+\usepackage{svg} %allows using svg figures
+\usepackage{tikz}
+\usepackage{makecell}
+\usepackage{subcaption}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{multicol}
+\usepackage{subcaption}
+
+\newcommand*{\defeq}{\stackrel{\text{def}}{=}}
+
+%Select the Epilogue font (requires luaLatex or XeLaTex compilers)
+\usepackage{fontspec}
+\setsansfont{Epilogue}[
+    Path=./epilogueFont/,
+    Scale=0.7,
+    Extension = .ttf,
+    UprightFont=*-Regular,
+    BoldFont=*-Bold,
+    ItalicFont=*-Italic,
+    BoldItalicFont=*-BoldItalic
+    ]
+
+%----------------------------------------------------------------------------------------
+%	TITLE PAGE
+%----------------------------------------------------------------------------------------
+
+\title[Kriterion]{Is your machine sick? An interpretable data-driven approach for condition monitoring} % The short title appears at the bottom of every slide, the full title is only on the title page
+\subtitle{Kriterion brownbag sessions No. 3}
+
+\author[Surname]{Ryan Balshaw}
+\institute[Brownbag sessions - 2025]{Kriterion \newline Pretoria, South Africa}
+% Your institution as it will appear on the bottom of every slide, maybe shorthand to save space
+
+% What is the message?
+%% Temporal structure enhances LVMs
+%% Signal processing and LVMs are not far removed under data pre-processing
+%% 
+
+
+\date{27 June 2025} % Date, can be changed to a custom date
+%----------------------------------------------------------------------------------------
+%	PRESENTATION SLIDES
+%----------------------------------------------------------------------------------------
+
+\begin{document}
+
+\begin{frame}[plain]
+    % Print the title page as the first slide
+    \titlepage
+\end{frame}
+
+\begin{frame}{Overview}
+    % Throughout your presentation, if you choose to use \section{} and \subsection{} commands, these will automatically be printed on this slide as an overview of your presentation
+    \tableofcontents
+    % Not compiling for some reason.
+\end{frame}
+
+%------------------------------------------------
+\section{Introduction and general overview}
+%------------------------------------------------
+
+\begin{frame}{Introduction}
+    % Provide context to problem!
+    \textbf{Context of problem:} I wanted my third brown-bag to conform to the following criteria:
+    \begin{itemize}
+        \item Introduce a fundamental concept that is ML/AI related.
+        \item Cover a concept that is not too far removed from everyone's understanding and have it be something we all might find interesting.
+        \item Drive intuition and understanding in the concept without over-burdening our minds.
+    \end{itemize}
+
+    \bigskip
+
+    \textbf{What did I settle on:} Logistic regression.
+
+    \bigskip
+
+    \textbf{Presentation structure:} Fundamentals $\rightarrow$ Interpretation $\rightarrow$ Application
+
+\end{frame}
+
+%------------------------------------------------
+\section{Part 1: Formulation and overview}
+%------------------------------------------------
+
+%------------------------------------------------
+\begin{frame}{Prelude: Linear regression}
+    We are all familiar with the idea of linear regression, which is fitting a linear function through data.
+    \begin{figure}
+        \centering
+        \includegraphics[width=0.3\linewidth]{figures/linear_regression.png}
+    \end{figure}
+
+    The functional form is simple:
+    \begin{equation}
+        y(\mathbf{x}, \mathbf{w}) = \mathbf{w}^T \mathbf{x},
+    \end{equation}
+    where $\mathbf{w} \in \mathbb{R}^{D}$ and $\mathbf{x} \in \mathbb{R}^D$ are the model parameters and input features, respectively. Importantly, this is a linear function with respect to the \emph{model parameters}, \textbf{not} with respect to the data.
+
+\end{frame}
+
+%------------------------------------------------
+\begin{frame}{The main event: Logistic regression}
+
+    Logistic regression defines a linear discriminative classification model, i.e., a model of $p(y\vert \mathbf{x})$ with $y \in [0, 1], \mathbf{x} \in \mathbb{R}^{D}$. To define this model, a linear mapping of data $\mathbf{x}$ to a single variable $z$. This linear mapping is given by
+
+    \begin{equation}
+        z(\mathbf{x}, \boldsymbol{\zeta}) = \mathbf{w}^T \mathbf{x} + b,
+    \end{equation}
+
+    where $\boldsymbol{\zeta}\in \mathbb{R}^{d+1}=[\mathbf{w}^T, b]^T$ is a vector containing $\mathbf{w} \in \mathbb{R}^{d}$ (a learnable weight vector) and $b$, a learnable scalar offset parameter, respectively.
+
+    \textbf{Question:} What does this remind us of?
+
+\end{frame}
+
+%------------------------------------------------
+\begin{frame}{The main event: Logistic regression}
+
+    So what does this look like?
+
+    \begin{figure}
+        \centering
+        \includegraphics[width=0.5\linewidth]{figures/logistic_regression_pre_logit.png}
+    \end{figure}
+
+
+\end{frame}
+
+%------------------------------------------------
+\begin{frame}{The main event: Logistic regression}
+
+    If only it was just a least-squares solution (sad)
+
+    \begin{figure}
+        \centering
+        \includegraphics[width=0.6\linewidth]{figures/logistic_meme_first.png}
+    \end{figure}
+
+
+\end{frame}
+
+%------------------------------------------------
+\begin{frame}{The main event: Logistic regression}
+
+    In a classification setting, a discriminative conditional distribution for a specific label $y$, i.e., $p(y=1\vert \mathbf{x}, \boldsymbol{\zeta})$, is required \emph{(Read: We need probabilities!!)}. This representation is easily given by
+
+    \begin{equation}
+        p(y = 1\vert \mathbf{x}, {\boldsymbol{\zeta}}) = \sigma(z_{\boldsymbol{\zeta}}(\mathbf{x}))=p,
+    \end{equation}
+
+    where $\sigma(z)$ represents the sigmoid function and is given by
+
+    \begin{equation}
+        \sigma(z) = \frac{1}{1 + e^{-z}}.
+    \end{equation}
+
+    We can also get the probability of the other label, given that $\sum_j p_j = 1$
+    \begin{equation}
+        p(y = 0\vert \mathbf{x}, {\boldsymbol{\zeta}}) = 1 - p.
+    \end{equation}
+
+\end{frame}
+
+%------------------------------------------------
+\begin{frame}{The main event: Logistic regression}
+
+    The sigmoid function looks as follows:
+
+    \begin{figure}
+        \centering
+        \includegraphics[width=0.5\linewidth]{figures/sigmoid.png}
+    \end{figure}
+
+\end{frame}
+
+%------------------------------------------------
+\begin{frame}{The main event: Logistic regression}
+
+    So what are we doing? I think this figure summarises it well:
+
+    \begin{figure}
+        \centering
+        \begin{subfigure}[t]{0.5\textwidth}
+            \centering
+            \includegraphics[width=0.85\linewidth]{figures/logistic_regression_pre_logit.png}
+            \caption{Pre-sigmoid.}
+        \end{subfigure}%
+        ~
+        \begin{subfigure}[t]{0.5\textwidth}
+            \centering
+            \includegraphics[width=0.85\linewidth]{figures/logistic_regression_post_logit.png}
+            \caption{Post-sigmoid.}
+        \end{subfigure}
+    \end{figure}
+
+\end{frame}
+%------------------------------------------------
+
+%------------------------------------------------
+\begin{frame}{The main event: Logistic regression}
+
+    A Bernoulli distribution can be used to define an estimator (\emph{read: objective function}) for the parameters $\widehat{\boldsymbol{\zeta}}$ via conditional maximum likelihood estimation (\emph{read: job security}). This is given by
+
+    \begin{equation}
+        p(y|\mathbf{x}, \boldsymbol{\zeta}) = \text{Bernoulli}(y|\sigma(z_{\boldsymbol{\zeta}}(\mathbf{x}))).
+    \end{equation}
+
+    Using this distribution, the probability mass function for a single observation $\mathbf{x}_i$ becomes
+
+    \begin{equation}
+        p(y|\mathbf{x}_i, \boldsymbol{\zeta}) = \sigma(z_{\boldsymbol{\zeta}}(\mathbf{x}_i))^y \cdot (1-\sigma(z_{\boldsymbol{\zeta}}(\mathbf{x}_i)))^{1-y}.
+    \end{equation}
+
+    Given a dataset $\mathcal{D}$ consisting of independent and identically distributed (i.i.d.) samples from some true data distribution $p_{data} \left(\mathbf{x}, y \right)$ the likelihood function (\emph{read: objective function}) is given by
+
+    \begin{equation}
+        l(\boldsymbol{\zeta}, \mathbf{X}, \mathbf{y}) = \prod^{N}_{i=1}p_i^{y_i}\cdot(1 - p_i)^{1-y_i}.
+    \end{equation}
+
+    where $\mathbf{X} \in \mathbb{R}^{N \times d} = \left[\mathbf{x}_1, \cdots, \mathbf{x}_N \right]^T$ and $p_i = p \left(y=1 \vert \mathbf{x}_i, {\boldsymbol{\zeta}} \right)$.
+
+\end{frame}
+
+%------------------------------------------------
+\begin{frame}{The main event: Logistic regression}
+
+    Finally, the log-likelihood (LL) function $L(\boldsymbol{\zeta}, \mathbf{X}, \mathbf{y})$ then becomes
+
+    \begin{equation}
+        L(\boldsymbol{\zeta}, \mathbf{X}, \mathbf{y}) = \sum_{i=1}^{N} y_i \ln p_i + (1 - y_i) \ln (1 - p_i),
+    \end{equation}
+
+    The LL function can be used to define the conditional maximum likelihood estimator (\emph{read: objective function}) for the estimate $\widehat{\boldsymbol{\zeta}}$ in numerical format as
+
+    \begin{equation}
+        \widehat{\boldsymbol{\zeta}} = \max_{\boldsymbol{\zeta}}L(\boldsymbol{\zeta}, \mathbf{X}, \mathbf{y}).
+    \end{equation}
+
+    What about the negative log likelihood? It is commonly known as the \href{https://en.wikipedia.org/wiki/Cross-entropy}{\textcolor{blue}{binary cross-entropy loss}}. If you want more information on how to optimise this function, refer to \href{https://ryanbalshaw.github.io/sjmelck_pages/blog/logistic-regression/}{\textcolor{blue}{Sjmelck!}}
+
+\end{frame}
+
+%------------------------------------------------
+\begin{frame}{The main event: Logistic regression}
+
+    Just a reminder on why this is a fundamental approach:
+
+    \begin{figure}
+        \centering
+        \includegraphics[width=0.4\linewidth]{figures/ml_joke.png}
+    \end{figure}
+
+    \textbf{Logistic regression = one layer neural network with no activation!}
+
+\end{frame}
+%------------------------------------------------
+\section{Part 2: Interpretation}
+%------------------------------------------------
+
+%------------------------------------------------
+\begin{frame}{Testing the model}
+    Consider a 2D problem where we have data sampled from two Gaussians:
+
+    \begin{figure}
+        \includegraphics[width=0.6\linewidth]{figures/dataset.png}
+    \end{figure}
+
+\end{frame}
+
+%------------------------------------------------
+\begin{frame}{Testing the model}
+
+    Training a model on this loss produces the following loss function
+
+    \begin{figure}
+        \includegraphics[width=0.6\linewidth]{figures/training_loss.png}
+    \end{figure}
+
+
+\end{frame}
+
+%------------------------------------------------
+\begin{frame}{Testing the model}
+
+    To interpret the logistic regression model, the linear function and distribution for class one, i.e., $p(y=1\vert \mathbf{x}, \boldsymbol{\zeta})$ can be inspected. These two functions are given by (external visualisation incoming!)
+
+    \begin{figure}
+        \includegraphics[width=0.35\linewidth]{figures/logistic_meme.png}
+    \end{figure}
+
+    We can see the linear function is a plane that splits the data into two classes.
+
+\end{frame}
+
+%------------------------------------------------
+\begin{frame}{Interpreting the model}
+
+
+    How can we interpret the model easily? Currently, only $z(\mathbf{x}, \boldsymbol{\zeta})$ contains linearity, while $p(y = 1\vert \mathbf{x}, {\boldsymbol{\zeta}})$ is non-linear due to $\sigma(u)$. Well, let's invert $\sigma(u)$ (conveniently is given by the logit function):
+
+    $$
+        \sigma^{-1}(p_i) = \ln \frac{p_i}{1-p_i}.
+    $$
+
+    Thus, the logit function can be applied as follows to
+
+    $$
+        \ln \frac{p(y = 1\vert \mathbf{x}, {\boldsymbol{\zeta}})}{p(y = 0\vert \mathbf{x}, {\boldsymbol{\zeta}})} = \mathbf{w}^T \mathbf{x} + b = z(\boldsymbol{\zeta}, \mathbf{x}).
+    $$
+
+    This is primarily useful as it provides an indication of what is being learnt by the model: the mapping $z$ represents the log-odds between the two classes.
+
+\end{frame}
+
+%------------------------------------------------
+\begin{frame}{Interpreting the model}
+
+
+    What is the implication of representing the log-odds? Let's consider these three scenarios:
+    \begin{enumerate}
+        \item $p(y = 1\vert \mathbf{x}, {\boldsymbol{\zeta}}) = p(y = 0\vert \mathbf{x}, {\boldsymbol{\zeta}})$
+        \item $p(y = 1\vert \mathbf{x}, {\boldsymbol{\zeta}}) > p(y = 0\vert \mathbf{x}, {\boldsymbol{\zeta}})$
+        \item $p(y = 1\vert \mathbf{x}, {\boldsymbol{\zeta}}) < p(y = 0\vert \mathbf{x}, {\boldsymbol{\zeta}})$
+    \end{enumerate}
+
+    \begin{figure}
+        \includegraphics[width=0.45\linewidth]{figures/natural_logarithm.png}
+    \end{figure}
+
+\end{frame}
+
+%------------------------------------------------
+\begin{frame}{Interpreting the model}
+
+    \textbf{Scenario: All $\mathbf{x}$ values are non-negative}
+
+    If all input features in $\mathbf{x}$ are non-negative ($x_i \ge 0$), the implication for interpreting the model is primarily related to the sign of the corresponding model parameters (weights, $\mathbf{w}$, and bias, $b$).
+
+    \begin{itemize}
+        \item If all components of the weight vector $\mathbf{w}$ are also non-negative (excluding the bias term $b$, which can be any real number), then the log-odds $z = \mathbf{w}^T \mathbf{x} + b$ will tend to be larger (more positive) for larger non-negative $x$ values.
+
+        \item A positive $w_i$ for a non-negative $x_i$ will contribute positively to $z$. Conversely, a negative $w_i$ would contribute negatively to $z$.
+
+        \item Therefore, if your features are strictly non-negative, the magnitude and sign of your learned weights $\mathbf{w}$ directly indicate the directional influence of each feature on the log-odds (and thus on the probability of $y=1$).
+              \begin{itemize}
+                  \item A large positive $w_i$ means that an increase in $x_i$ strongly increases the log-odds of $y=1$.
+                  \item A large negative $w_i$ means that an increase in $x_i$ strongly decreases the log-odds of $y=1$.
+              \end{itemize}
+    \end{itemize}
+
+\end{frame}
+
+%------------------------------------------------
+\section{Application}
+%------------------------------------------------
+\begin{frame}{Applying the model}
+    So let's take this into the real world. Consider the scenario where we obtain vibration data from a rotating machine. The vibration data is assumed to contain crucial information related to the instantaneous asset health state.
+
+    \begin{figure}
+        \includegraphics[width=0.45\linewidth]{figures/signal_examples.png}
+    \end{figure}
+
+\end{frame}
+
+%------------------------------------------------
+\begin{frame}{Applying the Model: Discussion Points}
+
+    \begin{enumerate}
+        \item \textbf{Utility of Example:} What makes this a particularly useful example for the application of the model?
+              \begin{itemize}
+                  \item \textit{Answer:} The model isn't trained on the raw time-series data directly. We develop it in data that is non-negative: The amplitude spectra.
+              \end{itemize}
+
+        \item \textbf{Concept Origin:} How was this approach conceived?
+              \begin{itemize}
+                  \item \textit{Answer:} The concept is credited to Hou et al. [2], whose work serves as the foundation for this methodology.
+              \end{itemize}
+
+        \item \textbf{Dataset Selection:} Which dataset will be utilised, and why?
+              \begin{itemize}
+                  \item \textit{Answer:} The IMS (Intelligent Maintenance Systems) bearing fault Diagnosis dataset will be used due to (1) popularity and (2)reference [2] uses it. This allows for direct methodological comparisons.
+              \end{itemize}
+
+    \end{enumerate}
+
+\end{frame}
+
+%------------------------------------------------
+\begin{frame}{A self-introspective interlude}
+
+    \textbf{Me rn:}
+
+    \begin{figure}
+        \includegraphics[width=0.45\linewidth]{figures/cm_meme.jpg}
+    \end{figure}
+
+\end{frame}
+
+%------------------------------------------------
+\begin{frame}{Paper process}
+
+    \begin{figure}
+        \includegraphics[width=0.75\linewidth]{figures/oses_summary.png}
+    \end{figure}
+
+\end{frame}
+
+%------------------------------------------------
+\begin{frame}{Results}
+
+    \textbf{Solution weights for specific vibration signals:}
+
+    \begin{figure}
+        \includegraphics[width=0.3\linewidth]{figures/exp_0_specific_results.png}
+    \end{figure}
+
+\end{frame}
+
+%------------------------------------------------
+\begin{frame}{Results}
+
+    \textbf{Solution weights for all vibration signals:}
+
+    \begin{figure}
+        \includegraphics[width=0.45\linewidth]{figures/exp_0_OSES.png}
+    \end{figure}
+
+\end{frame}
+
+%------------------------------------------------
+\section{Conclusion}
+%------------------------------------------------
+
+\begin{frame}{Conclusion}
+    I hope that you have gained some insight into:
+
+    \begin{enumerate}
+        \item Logistic regression and how it works.
+        \item How logistic regression can be used for interpretability.
+        \item How this interpretability can be used for fault diagnostics.
+    \end{enumerate}
+
+    Thank you for listening!
+
+\end{frame}
+
+\begin{frame}{References}
+
+    \begin{itemize}
+        \item[] {\small[1] Calvin Cordozar Broadus Jr. (n.d.) \href{https://www.youtube.com/watch?v=V697seq91Aw}{\textcolor{blue}{I Wanna Thank Me.}}}
+        \item[] {\small[2] Hou et al. \href{https://doi.org/10.1016/j.ymssp.2021.108779}{\textcolor{blue}{Interpretable online updated weights: Optimized square envelope spectrum for machine condition monitoring and fault diagnosis}}}, Mechanical Systems and Signal Processing, Volume 169, 15 April 2022, 108779
+    \end{itemize}
+
+\end{frame}
+%------------------------------------------------
+
+\end{document}
