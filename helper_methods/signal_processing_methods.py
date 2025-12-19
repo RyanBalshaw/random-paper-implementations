@@ -4,8 +4,10 @@ import scipy
 
 def fourier_spectrum(signal):
     N = len(signal)
-    return 1 / N * np.abs(np.fft.fft(signal))
+    X = 1 / N * np.abs(np.fft.fft(signal))
+    X[0] = 0
 
+    return X
 
 def normalised_fourier_spectrum(signal):
     X = fourier_spectrum(signal)
@@ -26,7 +28,10 @@ def square_envelope_spectrum(signal):
     SE = square_envelope(signal)
 
     N = len(SE)
-    return (1 / N * np.abs(np.fft.fft(SE))) ** 2
+    SES = (1 / N * np.abs(np.fft.fft(SE))) ** 2
+    SES[0] = 0
+
+    return SES
 
 
 def normalised_square_envelope_spectrum(signal):
