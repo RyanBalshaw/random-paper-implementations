@@ -164,12 +164,19 @@ class LogisticRegression(ClassifierMixin, BaseEstimator):
             else:
                 raise ValueError(f"Unknown regulariser type: {self.regulariser_type}")
 
-    def _initialise_coefficients(self):
-        if self.initial_coeffs is None:
-            self._zeta = np.random.randn(self.n_features_in_ + 1, 1) * 0.01
-
-        else:
+    def _initialise_coefficients(self, y=None):
+        if self.initial_coeffs is not None:
             self.set_coefficients(self.initial_coeffs)
+            return
+
+        # weights = 0
+        self._zeta = np.zeros((self.n_features_in_ + 1, 1))
+
+        # intercept = logit of class proportion
+        if y is not None:
+            p = np.mean(y)
+            p = np.clip(p, 1e-6, 1 - 1e-6)
+            self._zeta[-1, 0] = np.log(p / (1 - p))
 
     def _sigmoid(self, u):
         return 1 / (1 + np.exp(-u))
@@ -365,11 +372,11 @@ class LogisticRegression(ClassifierMixin, BaseEstimator):
         # Set up regularizer
         self._get_regulariser()
 
-        # Initialise the coefficients
-        self._initialise_coefficients()
-
         # Process class labels
         self.classes_, y = np.unique(y, return_inverse=True)
+
+        # Initialise the coefficients
+        self._initialise_coefficients(y)
 
         # Fit estimator using gradient descent
         self._optimise_coefficients(X, y)
