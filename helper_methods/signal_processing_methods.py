@@ -9,6 +9,7 @@ def fourier_spectrum(signal):
 
     return X
 
+
 def normalised_fourier_spectrum(signal):
     X = fourier_spectrum(signal)
     return X / np.sum(X)

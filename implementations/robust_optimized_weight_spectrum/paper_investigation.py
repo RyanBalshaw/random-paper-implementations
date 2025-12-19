@@ -1,17 +1,17 @@
 import copy
 import logging
 import os
-from typing import Tuple, Optional
+from typing import Optional, Tuple
 
 import matplotlib.colors as mcolors
 import numpy as np
 from matplotlib import pyplot as plt
 
 from helper_methods.signal_processing_methods import (
-    square_envelope_spectrum,
-    normalised_square_envelope_spectrum,
     fourier_spectrum,
-    normalised_fourier_spectrum
+    normalised_fourier_spectrum,
+    normalised_square_envelope_spectrum,
+    square_envelope_spectrum,
 )
 from implementations.robust_optimized_weight_spectrum.paper_utils import (
     LogisticRegression,
@@ -26,10 +26,10 @@ def load_signal(signal_path: str, data_channel: int = 0):
     # Return the required signal
     return data_matrix[:, data_channel].flatten()
 
+
 def get_freq_domain_representation(
     x_signal: np.ndarray, Fs: int, norm_flag: bool = True, se_flag: bool = False
 ) -> Tuple[np.ndarray, np.ndarray]:
-
     # Get the spectrum method
     if norm_flag and se_flag:
         spect_method = normalised_square_envelope_spectrum
@@ -38,7 +38,7 @@ def get_freq_domain_representation(
         spect_method = square_envelope_spectrum
 
     elif norm_flag and not se_flag:
-        spect_method =  normalised_fourier_spectrum
+        spect_method = normalised_fourier_spectrum
 
     elif not norm_flag and not se_flag:
         spect_method = fourier_spectrum
@@ -57,18 +57,18 @@ def get_freq_domain_representation(
 
     return freq, X
 
-def get_training_data(
-        x: np.ndarray,
-        truncation_freq: Optional[int],
-        Lw: Optional[int], # Can be None if hankel_flag is false
-        Ls: Optional[int], # Can be None if hankel_flag is false
-        Fs: int,
-        hankel_flag: bool,
-        norm_flag: bool,
-        se_flag: bool,
-        label_class: int
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
 
+def get_training_data(
+    x: np.ndarray,
+    truncation_freq: Optional[int],
+    Lw: Optional[int],  # Can be None if hankel_flag is false
+    Ls: Optional[int],  # Can be None if hankel_flag is false
+    Fs: int,
+    hankel_flag: bool,
+    norm_flag: bool,
+    se_flag: bool,
+    label_class: int,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     # Flatten signals
     x_flat = copy.deepcopy(x).flatten()
 
@@ -87,7 +87,9 @@ def get_training_data(
             x_segment = x_flat[int(idx * Ls) : int(idx * Ls) + Lw]
 
             # Compute SES
-            freq, x_ses = get_freq_domain_representation(x_segment, Fs=Fs, norm_flag=norm_flag, se_flag=se_flag)
+            freq, x_ses = get_freq_domain_representation(
+                x_segment, Fs=Fs, norm_flag=norm_flag, se_flag=se_flag
+            )
 
             # Store
             window_list.append(x_ses)
@@ -99,7 +101,9 @@ def get_training_data(
         Yf = np.ones(Nw) * label_class
 
     else:
-        freq, x_ses = get_freq_domain_representation(x_flat, Fs=Fs, norm_flag=norm_flag, se_flag=se_flag)
+        freq, x_ses = get_freq_domain_representation(
+            x_flat, Fs=Fs, norm_flag=norm_flag, se_flag=se_flag
+        )
         Xf_array = x_ses.reshape(1, -1)
         Yf = np.ones(1) * label_class
 
@@ -107,7 +111,7 @@ def get_training_data(
         # Truncate matrix
         trunc_index = np.argmin(np.abs(freq - truncation_freq))
 
-        Xf_array = Xf_array[:,  :trunc_index]
+        Xf_array = Xf_array[:, :trunc_index]
         freq = freq[:trunc_index]
 
     return Xf_array, Yf, freq
@@ -129,7 +133,7 @@ if __name__ == "__main__":
     Lsft = 400
     num_healthy = 30
     num_unhealthy = 10
-    iter_range = range(num_healthy, 900 - num_unhealthy, 1) # len(file_list)
+    iter_range = range(num_healthy, 900 - num_unhealthy, 1)  # len(file_list)
     hankel_flag = True
     norm_flag = True
     se_flag = True
@@ -166,7 +170,7 @@ if __name__ == "__main__":
         loss_values = OSES_results["loss_values"]
         OSES_matrix = OSES_results["OSES_matrix"]
 
-    except:
+    except OSError:
         logging.info("Could not load data. Starting training loop...")
         os.makedirs(save_dir, exist_ok=True)
 
@@ -188,7 +192,7 @@ if __name__ == "__main__":
                 hankel_flag=hankel_flag,
                 norm_flag=norm_flag,
                 se_flag=se_flag,
-                label_class=0
+                label_class=0,
             )
             Xh_list.append(Xhi)
             Yh_list.append(Yhi)
@@ -227,7 +231,7 @@ if __name__ == "__main__":
                     hankel_flag=hankel_flag,
                     norm_flag=norm_flag,
                     se_flag=se_flag,
-                    label_class=1
+                    label_class=1,
                 )
 
                 Xt_list.append(Xtj)
@@ -270,8 +274,6 @@ if __name__ == "__main__":
                 plt.plot(freq, model.get_coefficients()[:-1])
                 plt.show()
 
-
-
         # Create result dict
         OSES_matrix = np.array(OSES_list)
 
@@ -280,7 +282,7 @@ if __name__ == "__main__":
             "iteration_list": iteration_list,
             "loss_values": loss_values,
             "OSES_matrix": OSES_matrix,
-            "training_parameters": training_parameters  # Add the parameters here
+            "training_parameters": training_parameters,  # Add the parameters here
         }
 
         np.save(mat_save_path, OSES_results)
@@ -289,13 +291,17 @@ if __name__ == "__main__":
         # Visualise the signal and the spectra
         x_1 = load_signal(os.path.join(base_dir, file_list[0]))
         x_2 = load_signal(os.path.join(base_dir, file_list[750]))
-        t = np.arange(0, 1, 1/Fs)
+        t = np.arange(0, 1, 1 / Fs)
 
-        _, X1 = get_freq_domain_representation(x_1, Fs=Fs, norm_flag=norm_flag, se_flag=se_flag)
-        freq_sig, X2 = get_freq_domain_representation(x_2, Fs=Fs, norm_flag=norm_flag, se_flag=se_flag)
+        _, X1 = get_freq_domain_representation(
+            x_1, Fs=Fs, norm_flag=norm_flag, se_flag=se_flag
+        )
+        freq_sig, X2 = get_freq_domain_representation(
+            x_2, Fs=Fs, norm_flag=norm_flag, se_flag=se_flag
+        )
 
         fig, ax = plt.subplots(2, 2, figsize=(12, 10))
-        ax[0, 0].plot(t, x_1, color = "b")
+        ax[0, 0].plot(t, x_1, color="b")
         ax[0, 1].plot(t, x_2, color="b")
 
         for axs in ax[0, :]:
@@ -314,7 +320,12 @@ if __name__ == "__main__":
 
         ax[0, 0].set_ylabel("Time-series signal", fontsize=18)
         ax[1, 0].set_ylabel("Amplitude spectra", fontsize=18)
-        plt.savefig(os.path.join(save_dir, "figures", f"exp_{experiment_id}_signal_examples.png"), dpi=300)
+        plt.savefig(
+            os.path.join(
+                save_dir, "figures", f"exp_{experiment_id}_signal_examples.png"
+            ),
+            dpi=300,
+        )
         plt.show()
 
         # Remove zero values
@@ -326,20 +337,23 @@ if __name__ == "__main__":
 
         # View iterations to solution
         fig, ax = plt.subplots()
-        ax.plot(iter_range, iteration_list, color = "b", lw = 0.75)
+        ax.plot(iter_range, iteration_list, color="b", lw=0.75)
         ax.set_xlabel("Sample index")
         ax.set_ylabel("Iterations to solution")
         ax.grid(True)
-        plt.savefig(os.path.join(save_dir, "figures", f"exp_{experiment_id}_iterations.png"), dpi=300)
+        plt.savefig(
+            os.path.join(save_dir, "figures", f"exp_{experiment_id}_iterations.png"),
+            dpi=300,
+        )
         plt.show()
 
         # View specific solutions
         fig, ax = plt.subplots(4, 1, figsize=(8, 12))
 
         ax[0].plot(freq, OSES_matrix[300, :], color="b", label="Record 300")
-        ax[1].plot(freq, OSES_matrix[540, :], color = "b", label = "Record 540")
-        ax[2].plot(freq, OSES_matrix[700, :], color = "b", label = "Record 700")
-        ax[3].plot(freq, OSES_matrix[800, :], color = "b", label = "Record 800")
+        ax[1].plot(freq, OSES_matrix[540, :], color="b", label="Record 540")
+        ax[2].plot(freq, OSES_matrix[700, :], color="b", label="Record 700")
+        ax[3].plot(freq, OSES_matrix[800, :], color="b", label="Record 800")
 
         for axs in ax:
             axs.grid(True)
@@ -347,7 +361,12 @@ if __name__ == "__main__":
             axs.set_xlabel("Frequency (Hz)")
             axs.set_ylabel("Model\nparameters")
         plt.legend()
-        plt.savefig(os.path.join(save_dir, "figures", f"exp_{experiment_id}_specific_results.png"), dpi=300)
+        plt.savefig(
+            os.path.join(
+                save_dir, "figures", f"exp_{experiment_id}_specific_results.png"
+            ),
+            dpi=300,
+        )
         plt.show()
 
         # View OSES surface
@@ -361,5 +380,7 @@ if __name__ == "__main__":
         ax.set_xlabel("Frequency (Hz)")
         ax.set_ylabel("Sample index")
         ax.set_zlabel("OSES")
-        plt.savefig(os.path.join(save_dir, "figures", f"exp_{experiment_id}_OSES.png"), dpi=300)
+        plt.savefig(
+            os.path.join(save_dir, "figures", f"exp_{experiment_id}_OSES.png"), dpi=300
+        )
         plt.show()
