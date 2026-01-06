@@ -44,7 +44,7 @@ def bivariate_spectral(A, B, C, k, xs, ys):
 
 
 def plot_univariate_eigenfunctions(A, B, n_rows, n_cols):
-    """Plots λₖ(A + B * x) on a grid layout"""
+    """Plots y(x) = λₖ(A + B * x) on a grid layout"""
     fig, axs = plt.subplots(
         n_rows, n_cols, figsize=(3 * n_cols, 2 * n_rows), layout="constrained"
     )
@@ -57,7 +57,7 @@ def plot_univariate_eigenfunctions(A, B, n_rows, n_cols):
 
 
 def plot_bivariate_eigenfunctions_2d(A, B, C, n_rows, n_cols):
-    """Plots z = λₖ(A + B * x + C * y) on a grid layout"""
+    """Plots z(x, y) = λₖ(A + B * x + C * y) on a grid layout"""
     fig, axs = plt.subplots(
         n_rows,
         n_cols,
@@ -108,20 +108,26 @@ if __name__ == "__main__":
     A = np.random.randn(9, 9)
     B = -1.0 * make_psd(np.random.randn(9, 9))
     plot_univariate_eigenfunctions(A, B, 3, 3)
+
+    # Example five -> indefinite B
+    A = np.array([[1, np.sqrt(2)], [np.sqrt(2), 2]])
+    B = np.array([[-1, 0], [0, 2]])
+    plot_univariate_eigenfunctions(A, B, 1, 2)
+
     # Turns out eigenvalue functions are monotone -
     # if we take a matrix A and add the matrix xB whose eigenvalues are all
     # non-negative, the entire spectrum of eigenvalues increases. So larger x results
     # in larger eigenvalues, and vice versa, and we obtain an increasing function.
     # The opposite happens when all eigenvalues of B are non-positive.
 
-    # Example five -> 2D surface with 3x3 matrices
+    # Example six -> 2D surface with 3x3 matrices
     np.random.seed(42)
     A = np.random.randn(3, 3)
     B = np.random.randn(3, 3)
     C = np.random.randn(3, 3)
     plot_bivariate_eigenfunctions_2d(A, B, C, 1, 3)
 
-    # Example six -> 2D surface with 9x9 matrices
+    # Example seven -> 2D surface with 9x9 matrices
     np.random.seed(42)
     A = np.random.randn(9, 9)
     B = np.random.randn(9, 9)
