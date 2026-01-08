@@ -80,15 +80,35 @@ def plot_bivariate_eigenfunctions_2d(A, B, C, n_rows, n_cols):
 
 def make_psd(B):
     eigvals, eigvecs = sla.eigh(B)
-    eigvals_pos = np.maximum(0, eigvals)
+    eigvals_pos = np.maximum(0, eigvals) # Bound eigenvalues to [0, inf)
     return eigvecs @ np.diag(eigvals_pos) @ eigvecs.T
+
+def get_symmetric_matrix(n: int):
+    rand_mat = np.random.randn(n, n)
+    return (rand_mat + rand_mat.T) / 2
+
+def get_positive_definite_symmetric_matrix(n: int):
+    rand_mat = np.random.randn(n, n)
+    return rand_mat @ rand_mat.T
 
 
 if __name__ == "__main__":
-    # Example one -> 3x3 matrices
+    # Random 3x3 matrices
     np.random.seed(42)
     A = np.random.randn(3, 3)
     B = np.random.randn(3, 3)
+    plot_univariate_eigenfunctions(A, B, 1, 3)
+
+    # Symmetric 3x3 matrices
+    np.random.seed(42)
+    A = get_symmetric_matrix(3)
+    B = get_symmetric_matrix(3)
+    plot_univariate_eigenfunctions(A, B, 1, 3)
+
+    # Positive definite symmetric 3x3 matrices
+    np.random.seed(42)
+    A = get_positive_definite_symmetric_matrix(3)
+    B = get_positive_definite_symmetric_matrix(3)
     plot_univariate_eigenfunctions(A, B, 1, 3)
 
     # Example two -> 9x9 matrices
@@ -125,6 +145,18 @@ if __name__ == "__main__":
     A = np.random.randn(3, 3)
     B = np.random.randn(3, 3)
     C = np.random.randn(3, 3)
+    plot_bivariate_eigenfunctions_2d(A, B, C, 1, 3)
+
+    np.random.seed(42)
+    A = get_symmetric_matrix(3)
+    B = get_symmetric_matrix(3)
+    C = get_symmetric_matrix(3)
+    plot_bivariate_eigenfunctions_2d(A, B, C, 1, 3)
+
+    np.random.seed(42)
+    A = get_positive_definite_symmetric_matrix(3)
+    B = get_positive_definite_symmetric_matrix(3)
+    C = get_positive_definite_symmetric_matrix(3)
     plot_bivariate_eigenfunctions_2d(A, B, C, 1, 3)
 
     # Example seven -> 2D surface with 9x9 matrices
