@@ -80,12 +80,14 @@ def plot_bivariate_eigenfunctions_2d(A, B, C, n_rows, n_cols):
 
 def make_psd(B):
     eigvals, eigvecs = sla.eigh(B)
-    eigvals_pos = np.maximum(0, eigvals) # Bound eigenvalues to [0, inf)
+    eigvals_pos = np.maximum(0, eigvals)  # Bound eigenvalues to [0, inf)
     return eigvecs @ np.diag(eigvals_pos) @ eigvecs.T
+
 
 def get_symmetric_matrix(n: int):
     rand_mat = np.random.randn(n, n)
     return (rand_mat + rand_mat.T) / 2
+
 
 def get_positive_definite_symmetric_matrix(n: int):
     rand_mat = np.random.randn(n, n)

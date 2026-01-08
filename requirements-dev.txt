@@ -158,6 +158,12 @@ pygments==2.19.2
     # via rich
 pyparsing==3.2.3
     # via matplotlib
+pyqt6==6.10.1
+    # via random-paper-implementations
+pyqt6-qt6==6.10.1
+    # via pyqt6
+pyqt6-sip==13.10.3
+    # via pyqt6
 python-dateutil==2.9.0.post0
     # via matplotlib
 pyyaml==6.0.2

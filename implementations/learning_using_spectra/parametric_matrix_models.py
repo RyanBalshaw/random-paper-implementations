@@ -1,9 +1,10 @@
+from enum import StrEnum
 from typing import Any, Optional
 
 import numpy as np
 import tensorflow as tf
 from matplotlib import pyplot as plt
-from enum import StrEnum
+
 
 class EigenSelection(StrEnum):
     smallest_algebraic = "SA"
@@ -15,6 +16,7 @@ class EigenSelection(StrEnum):
     interior_algebraically = "IA"
     interior_by_magnitude = "IM"
 
+
 def booth_function(x: float, y: float) -> float:
     return (x + 2 * y - 7) ** 2 + (2 * x + y - 5) ** 2
 
@@ -22,17 +24,32 @@ def booth_function(x: float, y: float) -> float:
 def himmelblau_function(x: float, y: float) -> float:
     return (x**2 + y - 11) ** 2 + (x + y**2 - 7) ** 2
 
+
 def ackley_function(x: float, y: float) -> float:
-    return -20.0 * np.exp(-0.2 * np.sqrt(0.5 * (x**2 + y**2)))-np.exp(0.5 * (np.cos(2 * np.pi * x)+np.cos(2 * np.pi * y))) + np.e + 20
+    return (
+        -20.0 * np.exp(-0.2 * np.sqrt(0.5 * (x**2 + y**2)))
+        - np.exp(0.5 * (np.cos(2 * np.pi * x) + np.cos(2 * np.pi * y)))
+        + np.e
+        + 20
+    )
+
 
 def beale_function(x: float, y: float) -> float:
-    return (1.5 - x + x*y)**2 + (2.25 - x + x*y**2)**2 + (2.625 - x + x*y**3)**2
+    return (
+        (1.5 - x + x * y) ** 2
+        + (2.25 - x + x * y**2) ** 2
+        + (2.625 - x + x * y**3) ** 2
+    )
+
 
 def gaussians(x, y):
     u = 5 - 10 * x
     v = 5 - 10 * y
 
-    return np.exp(-u**2 / 2) + 3/4 * np.exp(-v**2 / 2) * (1 + np.exp(-u**2 / 2))
+    return np.exp(-(u**2) / 2) + 3 / 4 * np.exp(-(v**2) / 2) * (
+        1 + np.exp(-(u**2) / 2)
+    )
+
 
 function_lookup: dict[str : dict[str:Any]] = {
     "booth": {
@@ -54,7 +71,7 @@ function_lookup: dict[str : dict[str:Any]] = {
     "gaussians": {
         "function": gaussians,
         "domain": {"x": [0, 1], "y": [0, 1]},
-    }
+    },
 }
 
 
@@ -75,20 +92,24 @@ def make_trainset(
 
     return x, y, z
 
+
 class SymmetricMatrix(tf.keras.constraints.Constraint):
     # Enforce Hermitian matrix
     def call(self, w):
         return 0.5 * (w + tf.transpose(w))
 
+
 class AffineHermitianMatrix(tf.keras.layers.Layer):
-    def __init__(self,
+    def __init__(
+        self,
         matrix_size: int,
         num_features: int,
         init_scale: float = 1e-2,
         jitter: float | None = None,
         enforce_hermitian: bool = True,
         bias_term: bool = True,
-        name: Optional[str] = None):
+        name: Optional[str] = None,
+    ):
         super().__init__(name=name)
 
         self.matrix_size = matrix_size
@@ -107,7 +128,7 @@ class AffineHermitianMatrix(tf.keras.layers.Layer):
             trainable=True,
             name="projection_matrices",
             constraint=SymmetricMatrix() if self.enforce_hermitian else None,
-            initializer=tf.keras.initializers.RandomNormal(stddev=self.init_scale)
+            initializer=tf.keras.initializers.RandomNormal(stddev=self.init_scale),
         )
 
     def call(self, x):
@@ -128,6 +149,7 @@ class AffineHermitianMatrix(tf.keras.layers.Layer):
             projection_matrix += self.jitter * eye
 
         return projection_matrix
+
 
 def _select_indices(sorted_idx: tf.Tensor, k: int, which: str) -> tf.Tensor:
     """
@@ -163,11 +185,12 @@ def _select_indices(sorted_idx: tf.Tensor, k: int, which: str) -> tf.Tensor:
             n_half = n // 2
             k_half = k // 2
             k_rem = k - k_half
-            left = sorted_idx[:, n_half - k_half: n_half]
-            right = sorted_idx[:, n_half: n_half + k_rem]
+            left = sorted_idx[:, n_half - k_half : n_half]
+            right = sorted_idx[:, n_half : n_half + k_rem]
             return tf.concat([left, right], axis=-1)
         case _:  # Else
-            raise ValueError('which must start with one of S, L, E, or I.')
+            raise ValueError("which must start with one of S, L, E, or I.")
+
 
 class EigenvaluesSelector(tf.keras.layers.Layer):
     def __init__(
@@ -182,7 +205,9 @@ class EigenvaluesSelector(tf.keras.layers.Layer):
             raise ValueError("num_eig must be a positive int or None")
 
         if which not in EigenSelection:
-            raise ValueError(f"which must be one of {list(EigenSelection._value2member_map_.keys())}")
+            raise ValueError(
+                f"which must be one of {list(EigenSelection._value2member_map_.keys())}"
+            )
 
         self.num_eig = num_eig
         self.which = EigenSelection(which)
@@ -218,9 +243,10 @@ class EigenvaluesSelector(tf.keras.layers.Layer):
             return E_sel
 
         V_sorted = tf.gather(V, sorted_idx, batch_dims=1, axis=-1)  # (b, n, n)
-        V_sel = tf.gather(V_sorted, select_idx, batch_dims=1, axis=-1)     # (b, n, k)
+        V_sel = tf.gather(V_sorted, select_idx, batch_dims=1, axis=-1)  # (b, n, k)
 
         return E_sel, V_sel
+
 
 class AffineEigenvaluePMM(tf.keras.layers.Layer):
     def __init__(
@@ -246,16 +272,15 @@ class AffineEigenvaluePMM(tf.keras.layers.Layer):
             bias_term=bias_term,
             init_scale=init_scale,
             jitter=jitter,
-            name=f"aff_proj" if name is None else f"aff_proj_{name}",
+            name="aff_proj" if name is None else f"aff_proj_{name}",
         )
 
         self.selector = EigenvaluesSelector(
             num_eig=num_eig,
             which=which,
-            return_vectors=False, # Explicitly false in this learning scenario
-            name = f"eigen_selection" if name is None else f"eigen_selection{name}",
+            return_vectors=False,  # Explicitly false in this learning scenario
+            name="eigen_selection" if name is None else f"eigen_selection{name}",
         )
-
 
     def call(self, features: tf.Tensor):
         # Project
@@ -269,6 +294,7 @@ class AffineEigenvaluePMM(tf.keras.layers.Layer):
             return tf.keras.ops.sum(eigs, axis=1, keepdims=True)
         else:
             return eigs
+
 
 if __name__ == "__main__":
     # TODO: Formalise train and test sets
@@ -296,7 +322,12 @@ if __name__ == "__main__":
     dataset = (
         tf.data.Dataset.from_tensor_slices(
             (
-                np.hstack((x_train[:, None].astype(np.float32), y_train[:, None].astype(np.float32))),
+                np.hstack(
+                    (
+                        x_train[:, None].astype(np.float32),
+                        y_train[:, None].astype(np.float32),
+                    )
+                ),
                 z_train[:, None].astype(np.float32),
             )
         )
@@ -356,19 +387,16 @@ if __name__ == "__main__":
     Xg, Yg = np.meshgrid(xs, ys)
 
     Zg = model.predict(
-            np.hstack((
-                Xg.reshape(-1, 1).astype(np.float32),
-                Yg.reshape(-1, 1).astype(np.float32)
-            )
-        ), verbose=0)
+        np.hstack(
+            (Xg.reshape(-1, 1).astype(np.float32), Yg.reshape(-1, 1).astype(np.float32))
+        ),
+        verbose=0,
+    )
     Zg = Zg.reshape(Xg.shape)
 
     z_pred_train = model.predict(
         np.hstack(
-            (
-                x_train[:, None].astype(np.float32),
-                y_train[:, None].astype(np.float32)
-            )
+            (x_train[:, None].astype(np.float32), y_train[:, None].astype(np.float32))
         ),
         verbose=0,
     ).squeeze()
