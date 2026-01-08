@@ -51,6 +51,10 @@ def gaussians(x, y):
     )
 
 
+def trigonometric(x, y):
+    return 2 * np.cos(10 * x) * np.sin(10 * y) + np.sin(10 * x * y)
+
+
 function_lookup: dict[str : dict[str:Any]] = {
     "booth": {
         "function": booth_function,
@@ -70,6 +74,10 @@ function_lookup: dict[str : dict[str:Any]] = {
     },
     "gaussians": {
         "function": gaussians,
+        "domain": {"x": [0, 1], "y": [0, 1]},
+    },
+    "trigonometric": {
+        "function": trigonometric,
         "domain": {"x": [0, 1], "y": [0, 1]},
     },
 }
@@ -299,7 +307,7 @@ class AffineEigenvaluePMM(tf.keras.layers.Layer):
 if __name__ == "__main__":
     # TODO: Formalise train and test sets
     # Define function to approximate
-    function_name = "gaussians"
+    function_name = "trigonometric"
     n_train = 1000
     train_noise = 0.0
     batch_size = 512
